@@ -22,13 +22,14 @@ class StravaAPIError(Exception):
     """Raised for other non-2xx Strava responses or network errors."""
 
 
-def build_authorize_url():
+def build_authorize_url(state):
     params = {
         "client_id": current_app.config["STRAVA_CLIENT_ID"],
         "redirect_uri": current_app.config["STRAVA_REDIRECT_URI"],
         "response_type": "code",
         "approval_prompt": "auto",
         "scope": "read,activity:read_all",
+        "state": state,
     }
     return f"{AUTHORIZE_URL}?{urlencode(params)}"
 

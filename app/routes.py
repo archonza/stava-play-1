@@ -1,7 +1,9 @@
+import hmac
 import logging
+import secrets
 from datetime import datetime, timezone
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
 
 from app import db, strava
 
@@ -20,13 +22,21 @@ def index():
 
 @bp.route("/auth/strava")
 def auth_strava():
-    return redirect(strava.build_authorize_url())
+    state = secrets.token_urlsafe(24)
+    session["oauth_state"] = state
+    return redirect(strava.build_authorize_url(state))
 
 
 @bp.route("/auth/strava/callback")
 def auth_strava_callback():
     if request.args.get("error"):
+        session.pop("oauth_state", None)
         flash("Strava authorization was cancelled.", "error")
+        return redirect(url_for("main.index"))
+
+    expected_state = session.pop("oauth_state", None)
+    if not expected_state or not hmac.compare_digest(request.args.get("state", ""), expected_state):
+        flash("Invalid or expired authorization request. Please try connecting again.", "error")
         return redirect(url_for("main.index"))
 
     code = request.args.get("code")
@@ -65,3 +75,17 @@ def auth_strava_callback():
         "success",
     )
     return redirect(url_for("main.index"))
+
+
+@bp.route("/internal/sync", methods=["POST"])
+def internal_sync():
+    expected = current_app.config["SYNC_TOKEN"]
+    auth_header = request.headers.get("Authorization", "")
+    provided = auth_header[len("Bearer "):] if auth_header.startswith("Bearer ") else ""
+    if not expected or not hmac.compare_digest(provided, expected):
+        abort(401)
+
+    from app.scheduler import refresh_all_athletes
+
+    refresh_all_athletes(current_app._get_current_object())
+    return {"status": "ok"}, 200

@@ -9,6 +9,9 @@ minutes.
 ## Prerequisites
 
 - Python 3.10+
+- A Postgres database (a free [Neon](https://neon.tech) project works well
+  and needs no local install; `docker run -e POSTGRES_PASSWORD=postgres -p
+  5432:5432 postgres` also works if you'd rather run one locally)
 - A Strava account for each group member (they authorize the app themselves)
 
 ## 1. Create a Strava API application
@@ -23,7 +26,8 @@ minutes.
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate      # Linux/macOS
+source .venv/Scripts/activate  # Windows (Git Bash)
 pip install -r requirements.txt
 cp .env.example .env
 ```
@@ -36,7 +40,16 @@ STRAVA_CLIENT_SECRET=...
 STRAVA_REDIRECT_URI=http://localhost:5000/auth/strava/callback
 FLASK_SECRET_KEY=some-random-string
 REFRESH_INTERVAL_MINUTES=30
+DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
+SYNC_TOKEN=some-other-random-string
+APP_ENV=development
 ```
+
+`DATABASE_URL` is your Neon (or local) Postgres connection string. `SYNC_TOKEN`
+only matters in production (it authenticates Cloud Scheduler's calls to
+`/internal/sync`, see [DEPLOY.md](DEPLOY.md)) but is still required to start
+the app — any random string works locally. Leaving `APP_ENV` unset/`development`
+keeps the automatic in-process 30-minute refresh used below.
 
 ## 3. Run
 
@@ -70,5 +83,10 @@ Visit `http://localhost:5000`.
   settings, their row shows a "sync error" badge and keeps its last known
   total until they reconnect via the same "Connect your Strava account"
   link.
-- **Data storage**: tokens and cached totals are stored locally in
-  `instance/strava_tracker.db` (SQLite), which is not committed to git.
+- **Data storage**: tokens and cached totals are stored in the Postgres
+  database at `DATABASE_URL`.
+
+## Deploying
+
+See [DEPLOY.md](DEPLOY.md) for a step-by-step guide to running this on
+Google Cloud Run's free tier.
