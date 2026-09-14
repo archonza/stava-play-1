@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>Group Running Leaderboard</h1>
+  <p class="subtitle">Total kilometers run this month, per connected Strava account.</p>
+
+  {% if athletes %}
+    <table>
+      <thead>
+        <tr>
+          <th class="rank">#</th>
+          <th>Name</th>
+          <th class="km">Km this month</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for athlete in athletes %}
+          <tr>
+            <td class="rank">{{ loop.index }}</td>
+            <td>
+              {{ athlete["firstname"] }} {{ athlete["lastname"] }}
+              {% if athlete["last_sync_error"] %}
+                <span class="error-badge" title="{{ athlete['last_sync_error'] }}">sync error</span>
+              {% endif %}
+            </td>
+            <td class="km">{{ "%.1f"|format(athlete["monthly_km"]) }} km</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="last-updated">Last updated: {{ last_updated or "never" }}</p>
+  {% else %}
+    <p class="empty-state">No one has connected yet — be the first!</p>
+  {% endif %}
+
+  <a class="connect-btn" href="{{ url_for('main.auth_strava') }}">Connect your Strava account</a>
+{% endblock %}

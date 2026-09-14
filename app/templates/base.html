@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Strava Group KM Tracker{% endblock %}</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #222;
+      background: #fafafa;
+    }
+    h1 { margin-bottom: 0.25rem; }
+    .subtitle { color: #666; margin-top: 0; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid #ddd; }
+    th { color: #555; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    tr:first-child td { font-weight: 600; }
+    .rank { width: 2.5rem; color: #999; }
+    .km { text-align: right; font-variant-numeric: tabular-nums; }
+    .error-badge {
+      display: inline-block;
+      margin-left: 0.4rem;
+      padding: 0.1rem 0.4rem;
+      font-size: 0.75rem;
+      background: #fde2e2;
+      color: #a12525;
+      border-radius: 4px;
+    }
+    .connect-btn {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.6rem 1.1rem;
+      background: #fc4c02;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .connect-btn:hover { background: #e04502; }
+    .flash { padding: 0.6rem 0.9rem; border-radius: 6px; margin-bottom: 1rem; }
+    .flash-success { background: #e3f6e5; color: #1f6d2b; }
+    .flash-error { background: #fde2e2; color: #a12525; }
+    .empty-state { color: #666; margin-top: 1.5rem; }
+    .last-updated { color: #999; font-size: 0.85rem; margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</body>
+</html>
