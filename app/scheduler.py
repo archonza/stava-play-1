@@ -21,10 +21,11 @@ def refresh_all_athletes(app):
         for athlete in athletes:
             try:
                 access_token = strava.get_valid_access_token(athlete)
-                km = strava.fetch_monthly_running_km(access_token)
+                totals = strava.fetch_running_totals(access_token)
                 db.update_athlete_totals(
                     athlete["athlete_id"],
-                    km,
+                    totals["monthly_km"],
+                    totals["yearly_km"],
                     datetime.now(timezone.utc).isoformat(),
                     today,
                     error=None,

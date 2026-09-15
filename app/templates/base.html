@@ -15,15 +15,53 @@
     }
     h1 { margin-bottom: 0.25rem; }
     .subtitle { color: #666; margin-top: 0; margin-bottom: 1.5rem; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; table-layout: fixed; }
+    .table-wrap { overflow-x: auto; }
     th, td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid #ddd; }
     th { color: #555; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
     tr:first-child td { font-weight: 600; }
     .rank { width: 2.5rem; color: #999; text-align: center; }
     .medal { display: inline-block; line-height: 1; vertical-align: middle; font-size: 1.1rem; }
-    .km { text-align: right; font-variant-numeric: tabular-nums; }
+    .km { width: 4.5rem; text-align: right; font-variant-numeric: tabular-nums; }
     .ran-today { width: 2rem; text-align: center; }
     .ran-today-arrow { color: rgba(46, 125, 50, 0.55); font-size: 1.2rem; line-height: 1; }
+    .track-col { width: 45%; }
+    .lane { position: relative; height: 1.4rem; min-width: 150px; }
+    .lane::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #ddd;
+      transform: translateY(-50%);
+    }
+    .lane-start {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      width: 2px;
+      height: 0.7rem;
+      background: #bbb;
+      transform: translateY(-50%);
+    }
+    .lane-finish {
+      position: absolute;
+      right: -0.1rem;
+      top: 50%;
+      font-size: 0.95rem;
+      line-height: 1;
+      transform: translateY(-50%);
+    }
+    .runner {
+      position: absolute;
+      top: 50%;
+      font-size: 1.15rem;
+      line-height: 1;
+      transform: translate(-50%, -50%);
+      z-index: 1;
+    }
     .error-badge {
       display: inline-block;
       margin-left: 0.4rem;

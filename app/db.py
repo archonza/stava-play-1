@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS athletes (
     refresh_token    TEXT NOT NULL,
     token_expires_at BIGINT NOT NULL,
     monthly_km       DOUBLE PRECISION NOT NULL DEFAULT 0,
+    yearly_km        DOUBLE PRECISION NOT NULL DEFAULT 0,
+    sex              TEXT,
     day_start_km     DOUBLE PRECISION NOT NULL DEFAULT 0,
     day_start_date   TEXT,
     last_synced_at   TEXT,
@@ -22,6 +24,8 @@ CREATE TABLE IF NOT EXISTS athletes (
 MIGRATIONS = [
     "ALTER TABLE athletes ADD COLUMN IF NOT EXISTS day_start_km DOUBLE PRECISION NOT NULL DEFAULT 0",
     "ALTER TABLE athletes ADD COLUMN IF NOT EXISTS day_start_date TEXT",
+    "ALTER TABLE athletes ADD COLUMN IF NOT EXISTS yearly_km DOUBLE PRECISION NOT NULL DEFAULT 0",
+    "ALTER TABLE athletes ADD COLUMN IF NOT EXISTS sex TEXT",
 ]
 
 
@@ -48,21 +52,22 @@ def init_db(app):
     app.teardown_appcontext(close_db)
 
 
-def upsert_athlete(athlete_id, firstname, lastname, access_token, refresh_token, expires_at):
+def upsert_athlete(athlete_id, firstname, lastname, access_token, refresh_token, expires_at, sex=None):
     db = get_db()
     db.execute(
         """
-        INSERT INTO athletes (athlete_id, firstname, lastname, access_token, refresh_token, token_expires_at)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO athletes (athlete_id, firstname, lastname, access_token, refresh_token, token_expires_at, sex)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (athlete_id) DO UPDATE SET
             firstname = excluded.firstname,
             lastname = excluded.lastname,
             access_token = excluded.access_token,
             refresh_token = excluded.refresh_token,
             token_expires_at = excluded.token_expires_at,
+            sex = excluded.sex,
             last_sync_error = NULL
         """,
-        (athlete_id, firstname, lastname, access_token, refresh_token, expires_at),
+        (athlete_id, firstname, lastname, access_token, refresh_token, expires_at, sex),
     )
     db.commit()
 
@@ -80,9 +85,9 @@ def update_athlete_tokens(athlete_id, access_token, refresh_token, expires_at):
     db.commit()
 
 
-def update_athlete_totals(athlete_id, monthly_km, synced_at, today, error=None):
-    """Update an athlete's monthly total and roll over their "start of day"
-    baseline whenever `today` differs from the stored day_start_date, so
+def update_athlete_totals(athlete_id, monthly_km, yearly_km, synced_at, today, error=None):
+    """Update an athlete's monthly/yearly totals and roll over their "start of
+    day" baseline whenever `today` differs from the stored day_start_date, so
     `monthly_km > day_start_km` reflects whether they've run today.
     """
     db = get_db()
@@ -97,6 +102,7 @@ def update_athlete_totals(athlete_id, monthly_km, synced_at, today, error=None):
             END,
             day_start_date = %(today)s,
             monthly_km = %(km)s,
+            yearly_km = %(yearly_km)s,
             last_synced_at = %(synced_at)s,
             last_sync_error = %(error)s
         WHERE athlete_id = %(athlete_id)s
@@ -104,6 +110,7 @@ def update_athlete_totals(athlete_id, monthly_km, synced_at, today, error=None):
         {
             "today": today,
             "km": monthly_km,
+            "yearly_km": yearly_km,
             "synced_at": synced_at,
             "error": error,
             "athlete_id": athlete_id,

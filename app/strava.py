@@ -97,10 +97,27 @@ def month_bounds_utc():
     return int(start.timestamp()), int(end.timestamp())
 
 
-def fetch_monthly_running_km(access_token):
-    after, before = month_bounds_utc()
+def year_bounds_utc():
+    now = datetime.now(timezone.utc)
+    start = datetime(now.year, 1, 1, tzinfo=timezone.utc)
+    end = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+    return int(start.timestamp()), int(end.timestamp())
+
+
+def _activity_start_ts(activity):
+    return datetime.fromisoformat(activity["start_date"].replace("Z", "+00:00")).timestamp()
+
+
+def fetch_running_totals(access_token):
+    """Fetch this athlete's running distance for the current month and the
+    current year in a single paged pass over the year's activities, so the
+    two totals can never disagree from being fetched separately.
+    """
+    after, before = year_bounds_utc()
+    month_start, _ = month_bounds_utc()
     headers = {"Authorization": f"Bearer {access_token}"}
-    total_meters = 0.0
+    monthly_meters = 0.0
+    yearly_meters = 0.0
     page = 1
 
     while True:
@@ -127,11 +144,15 @@ def fetch_monthly_running_km(access_token):
 
         for activity in activities:
             sport = activity.get("sport_type") or activity.get("type")
-            if sport in RUNNING_TYPES:
-                total_meters += activity.get("distance", 0) or 0
+            if sport not in RUNNING_TYPES:
+                continue
+            distance = activity.get("distance", 0) or 0
+            yearly_meters += distance
+            if _activity_start_ts(activity) >= month_start:
+                monthly_meters += distance
 
         if len(activities) < PER_PAGE:
             break
         page += 1
 
-    return total_meters / 1000.0
+    return {"monthly_km": monthly_meters / 1000.0, "yearly_km": yearly_meters / 1000.0}

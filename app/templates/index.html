@@ -5,6 +5,7 @@
   <p class="subtitle">Total kilometers run this month, per connected Strava account.</p>
 
   {% if athletes %}
+    <div class="table-wrap">
     <table>
       <thead>
         <tr>
@@ -12,6 +13,7 @@
           <th>Name</th>
           <th class="km">Km this month</th>
           <th class="ran-today" title="Ran today">&nbsp;</th>
+          <th class="track-col" title="Yearly progress">Year so far</th>
         </tr>
       </thead>
       <tbody>
@@ -40,10 +42,26 @@
                 <span class="ran-today-arrow" title="Ran today">&#9650;</span>
               {% endif %}
             </td>
+            <td class="track-col">
+              <div class="lane">
+                <span class="lane-start" aria-hidden="true"></span>
+                <span class="lane-finish" title="Dec 31">🏁</span>
+                {% if athlete["sex"] == "M" %}
+                  {% set icon = "🏃‍♂️" %}
+                {% elif athlete["sex"] == "F" %}
+                  {% set icon = "🏃‍♀️" %}
+                {% else %}
+                  {% set icon = "🏃" %}
+                {% endif %}
+                <span class="runner" style="left: {{ athlete['track_pct'] }}%;"
+                      title="{{ '%.1f'|format(athlete['yearly_km']) }} km this year">{{ icon }}</span>
+              </div>
+            </td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
     <p class="last-updated">
       Last updated: {{ last_updated_display or "never" }}
       {% if minutes_until_next is not none %}

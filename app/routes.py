@@ -6,15 +6,15 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
 
 from app import db, strava
-from app.utils import SAST, today_sast
+from app.utils import SAST, today_sast, track_fraction, year_progress_sast
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("main", __name__)
 
-# Dev-only fixtures for eyeballing the "ran today" arrow without a real Strava
-# account. Never shown when APP_ENV=production (see index() below), so this
-# never reaches the deployed site.
+# Dev-only fixtures for eyeballing the "ran today" arrow and the yearly
+# progress track without real Strava data. Never shown when APP_ENV=production
+# (see index() below), so this never reaches the deployed site.
 FAKE_ATHLETES = [
     {
         "athlete_id": -1,
@@ -23,6 +23,8 @@ FAKE_ATHLETES = [
         "monthly_km": 42.5,
         "day_start_km": 30.0,
         "ran_today": True,
+        "yearly_km": 900.0,
+        "sex": "M",
         "last_sync_error": None,
         "last_synced_at": None,
     },
@@ -33,6 +35,20 @@ FAKE_ATHLETES = [
         "monthly_km": 15.0,
         "day_start_km": 15.0,
         "ran_today": False,
+        "yearly_km": 300.0,
+        "sex": "F",
+        "last_sync_error": None,
+        "last_synced_at": None,
+    },
+    {
+        "athlete_id": -3,
+        "firstname": "Test",
+        "lastname": "Unknown-Gender",
+        "monthly_km": 8.0,
+        "day_start_km": 8.0,
+        "ran_today": False,
+        "yearly_km": 120.0,
+        "sex": None,
         "last_sync_error": None,
         "last_synced_at": None,
     },
@@ -68,9 +84,21 @@ def index():
             list(athletes) + FAKE_ATHLETES, key=lambda a: a["monthly_km"], reverse=True
         )
 
+    day_of_year, days_in_year = year_progress_sast()
+    leader_km = max((a["yearly_km"] for a in display_athletes), default=0)
+    track_athletes = [
+        {
+            **dict(a),
+            "track_pct": round(
+                track_fraction(a["yearly_km"], leader_km, day_of_year, days_in_year) * 100, 2
+            ),
+        }
+        for a in display_athletes
+    ]
+
     return render_template(
         "index.html",
-        athletes=display_athletes,
+        athletes=track_athletes,
         last_updated_display=last_updated_display,
         minutes_until_next=minutes_until_next,
     )
@@ -114,13 +142,15 @@ def auth_strava_callback():
         token_data["access_token"],
         token_data["refresh_token"],
         token_data["expires_at"],
+        athlete.get("sex"),
     )
 
     try:
-        km = strava.fetch_monthly_running_km(token_data["access_token"])
+        totals = strava.fetch_running_totals(token_data["access_token"])
         db.update_athlete_totals(
             athlete["id"],
-            km,
+            totals["monthly_km"],
+            totals["yearly_km"],
             datetime.now(timezone.utc).isoformat(),
             today_sast(),
             error=None,
