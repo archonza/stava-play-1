@@ -6,12 +6,37 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
 
 from app import db, strava
+from app.utils import SAST, today_sast
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("main", __name__)
 
-SAST = timezone(timedelta(hours=2))
+# Dev-only fixtures for eyeballing the "ran today" arrow without a real Strava
+# account. Never shown when APP_ENV=production (see index() below), so this
+# never reaches the deployed site.
+FAKE_ATHLETES = [
+    {
+        "athlete_id": -1,
+        "firstname": "Test",
+        "lastname": "Ran-Today",
+        "monthly_km": 42.5,
+        "day_start_km": 30.0,
+        "ran_today": True,
+        "last_sync_error": None,
+        "last_synced_at": None,
+    },
+    {
+        "athlete_id": -2,
+        "firstname": "Test",
+        "lastname": "Rest-Day",
+        "monthly_km": 15.0,
+        "day_start_km": 15.0,
+        "ran_today": False,
+        "last_sync_error": None,
+        "last_synced_at": None,
+    },
+]
 
 
 def _parse_utc(iso_str):
@@ -37,9 +62,15 @@ def index():
         remaining_minutes = (next_update_utc - datetime.now(timezone.utc)).total_seconds() / 60
         minutes_until_next = max(0, round(remaining_minutes))
 
+    display_athletes = athletes
+    if current_app.config["APP_ENV"] != "production":
+        display_athletes = sorted(
+            list(athletes) + FAKE_ATHLETES, key=lambda a: a["monthly_km"], reverse=True
+        )
+
     return render_template(
         "index.html",
-        athletes=athletes,
+        athletes=display_athletes,
         last_updated_display=last_updated_display,
         minutes_until_next=minutes_until_next,
     )
@@ -88,7 +119,11 @@ def auth_strava_callback():
     try:
         km = strava.fetch_monthly_running_km(token_data["access_token"])
         db.update_athlete_totals(
-            athlete["id"], km, datetime.now(timezone.utc).isoformat(), error=None
+            athlete["id"],
+            km,
+            datetime.now(timezone.utc).isoformat(),
+            today_sast(),
+            error=None,
         )
     except (strava.StravaAuthError, strava.StravaAPIError) as exc:
         logger.warning("Initial fetch failed for athlete %s: %s", athlete["id"], exc)

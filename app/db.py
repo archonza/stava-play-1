@@ -11,11 +11,18 @@ CREATE TABLE IF NOT EXISTS athletes (
     refresh_token    TEXT NOT NULL,
     token_expires_at BIGINT NOT NULL,
     monthly_km       DOUBLE PRECISION NOT NULL DEFAULT 0,
+    day_start_km     DOUBLE PRECISION NOT NULL DEFAULT 0,
+    day_start_date   TEXT,
     last_synced_at   TEXT,
     last_sync_error  TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 """
+
+MIGRATIONS = [
+    "ALTER TABLE athletes ADD COLUMN IF NOT EXISTS day_start_km DOUBLE PRECISION NOT NULL DEFAULT 0",
+    "ALTER TABLE athletes ADD COLUMN IF NOT EXISTS day_start_date TEXT",
+]
 
 
 def get_db():
@@ -34,6 +41,8 @@ def init_db(app):
     with app.app_context():
         conn = psycopg.connect(app.config["DATABASE_URL"])
         conn.execute(SCHEMA)
+        for migration in MIGRATIONS:
+            conn.execute(migration)
         conn.commit()
         conn.close()
     app.teardown_appcontext(close_db)
@@ -71,15 +80,34 @@ def update_athlete_tokens(athlete_id, access_token, refresh_token, expires_at):
     db.commit()
 
 
-def update_athlete_totals(athlete_id, monthly_km, synced_at, error=None):
+def update_athlete_totals(athlete_id, monthly_km, synced_at, today, error=None):
+    """Update an athlete's monthly total and roll over their "start of day"
+    baseline whenever `today` differs from the stored day_start_date, so
+    `monthly_km > day_start_km` reflects whether they've run today.
+    """
     db = get_db()
     db.execute(
         """
         UPDATE athletes
-        SET monthly_km = %s, last_synced_at = %s, last_sync_error = %s
-        WHERE athlete_id = %s
+        SET
+            day_start_km = CASE
+                WHEN day_start_date IS DISTINCT FROM %(today)s
+                    THEN CASE WHEN %(km)s < monthly_km THEN 0 ELSE monthly_km END
+                ELSE day_start_km
+            END,
+            day_start_date = %(today)s,
+            monthly_km = %(km)s,
+            last_synced_at = %(synced_at)s,
+            last_sync_error = %(error)s
+        WHERE athlete_id = %(athlete_id)s
         """,
-        (monthly_km, synced_at, error, athlete_id),
+        {
+            "today": today,
+            "km": monthly_km,
+            "synced_at": synced_at,
+            "error": error,
+            "athlete_id": athlete_id,
+        },
     )
     db.commit()
 
@@ -95,7 +123,13 @@ def record_sync_error(athlete_id, error):
 
 def get_all_athletes():
     db = get_db()
-    return db.execute("SELECT * FROM athletes ORDER BY monthly_km DESC").fetchall()
+    return db.execute(
+        """
+        SELECT *, (monthly_km > day_start_km) AS ran_today
+        FROM athletes
+        ORDER BY monthly_km DESC
+        """
+    ).fetchall()
 
 
 def get_athlete(athlete_id):

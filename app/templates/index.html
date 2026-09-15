@@ -11,26 +11,35 @@
           <th class="rank">#</th>
           <th>Name</th>
           <th class="km">Km this month</th>
+          <th class="ran-today" title="Ran today">&nbsp;</th>
         </tr>
       </thead>
       <tbody>
         {% for athlete in athletes %}
           <tr>
-            <td class="rank">{{ loop.index }}</td>
-            <td>
+            <td class="rank">
               {% if loop.index == 1 %}
                 <span class="medal medal-gold" title="1st place">🥇</span>
               {% elif loop.index == 2 %}
                 <span class="medal medal-silver" title="2nd place">🥈</span>
               {% elif loop.index == 3 %}
                 <span class="medal medal-bronze" title="3rd place">🥉</span>
+              {% else %}
+                {{ loop.index }}
               {% endif %}
+            </td>
+            <td>
               {{ athlete["firstname"] }} {{ athlete["lastname"] }}
               {% if athlete["last_sync_error"] %}
                 <span class="error-badge" title="{{ athlete['last_sync_error'] }}">sync error</span>
               {% endif %}
             </td>
             <td class="km">{{ "%.1f"|format(athlete["monthly_km"]) }} km</td>
+            <td class="ran-today">
+              {% if athlete["ran_today"] %}
+                <span class="ran-today-arrow" title="Ran today">&#9650;</span>
+              {% endif %}
+            </td>
           </tr>
         {% endfor %}
       </tbody>

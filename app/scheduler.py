@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app import db, strava
+from app.utils import today_sast
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ def refresh_all_athletes(app):
         athletes = db.get_all_athletes()
         synced = 0
         errored = 0
+        today = today_sast()
 
         for athlete in athletes:
             try:
@@ -24,6 +26,7 @@ def refresh_all_athletes(app):
                     athlete["athlete_id"],
                     km,
                     datetime.now(timezone.utc).isoformat(),
+                    today,
                     error=None,
                 )
                 synced += 1
