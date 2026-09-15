@@ -152,3 +152,74 @@ gcloud run deploy strava-km-tracker --source . --region us-central1
 
 Env vars and secrets already set on the service persist across redeploys —
 you only need `--set-env-vars`/`--set-secrets` again if a value changes.
+
+## Redeploying from GitHub Actions instead
+
+If you'd rather trigger redeploys from GitHub than run `gcloud` locally every
+time, this repo includes `.github/workflows/deploy.yml`, a manually-triggered
+("Run workflow" button in the Actions tab) job that runs the same `gcloud run
+deploy` command shown above. It authenticates using Workload Identity
+Federation — no long-lived Google credential is stored in GitHub.
+
+This is a one-time setup, run locally with `gcloud` (already authenticated
+from step 3):
+
+```bash
+PROJECT_ID=$(gcloud config get-value project)
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+
+# 1. A workload identity pool + OIDC provider that trusts GitHub Actions,
+#    restricted to this repo only.
+gcloud iam workload-identity-pools create "github-pool" \
+  --project="$PROJECT_ID" \
+  --location="global" \
+  --display-name="GitHub Actions Pool"
+
+gcloud iam workload-identity-pools providers create-oidc "github-provider" \
+  --project="$PROJECT_ID" \
+  --location="global" \
+  --workload-identity-pool="github-pool" \
+  --display-name="GitHub provider" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  --attribute-condition="assertion.repository=='archonza/stava-play-1'" \
+  --issuer-uri="https://token.actions.githubusercontent.com"
+
+# 2. A dedicated deployer service account with just enough permission to
+#    build (via Cloud Build) and deploy to Cloud Run.
+gcloud iam service-accounts create "github-deployer" \
+  --project="$PROJECT_ID" \
+  --display-name="GitHub Actions Cloud Run deployer"
+
+DEPLOYER_SA="github-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
+
+for ROLE in roles/run.admin roles/iam.serviceAccountUser roles/cloudbuild.builds.editor roles/storage.admin; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${DEPLOYER_SA}" \
+    --role="$ROLE"
+done
+
+# 3. Let only this repo impersonate that service account.
+gcloud iam service-accounts add-iam-policy-binding "$DEPLOYER_SA" \
+  --project="$PROJECT_ID" \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-pool/attribute.repository/archonza/stava-play-1"
+
+# 4. Print the value you need for the GCP_WIF_PROVIDER secret below.
+gcloud iam workload-identity-pools providers describe "github-provider" \
+  --project="$PROJECT_ID" \
+  --location="global" \
+  --workload-identity-pool="github-pool" \
+  --format="value(name)"
+```
+
+Then, in the GitHub repo (Settings → Secrets and variables → Actions →
+"New repository secret"), add three secrets:
+
+| Secret name | Value |
+|---|---|
+| `GCP_PROJECT_ID` | `$PROJECT_ID` from above |
+| `GCP_WIF_PROVIDER` | the full resource name printed by the last command |
+| `GCP_SERVICE_ACCOUNT` | `github-deployer@<PROJECT_ID>.iam.gserviceaccount.com` |
+
+After that, go to the repo's **Actions** tab → **Deploy to Cloud Run** →
+**Run workflow** any time you want to push the latest commit live.
