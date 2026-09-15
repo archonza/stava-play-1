@@ -18,6 +18,13 @@
           <tr>
             <td class="rank">{{ loop.index }}</td>
             <td>
+              {% if loop.index == 1 %}
+                <span class="medal medal-gold" title="1st place">🥇</span>
+              {% elif loop.index == 2 %}
+                <span class="medal medal-silver" title="2nd place">🥈</span>
+              {% elif loop.index == 3 %}
+                <span class="medal medal-bronze" title="3rd place">🥉</span>
+              {% endif %}
               {{ athlete["firstname"] }} {{ athlete["lastname"] }}
               {% if athlete["last_sync_error"] %}
                 <span class="error-badge" title="{{ athlete['last_sync_error'] }}">sync error</span>
@@ -28,7 +35,12 @@
         {% endfor %}
       </tbody>
     </table>
-    <p class="last-updated">Last updated: {{ last_updated or "never" }}</p>
+    <p class="last-updated">
+      Last updated: {{ last_updated_display or "never" }}
+      {% if minutes_until_next is not none %}
+        &middot; Next update in {{ minutes_until_next }} min
+      {% endif %}
+    </p>
   {% else %}
     <p class="empty-state">No one has connected yet — be the first!</p>
   {% endif %}

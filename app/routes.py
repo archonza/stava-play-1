@@ -1,7 +1,7 @@
 import hmac
 import logging
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
 
@@ -11,13 +11,38 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint("main", __name__)
 
+SAST = timezone(timedelta(hours=2))
+
+
+def _parse_utc(iso_str):
+    dt = datetime.fromisoformat(iso_str)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
 
 @bp.route("/")
 def index():
     athletes = db.get_all_athletes()
     synced_timestamps = [a["last_synced_at"] for a in athletes if a["last_synced_at"]]
-    last_updated = max(synced_timestamps) if synced_timestamps else None
-    return render_template("index.html", athletes=athletes, last_updated=last_updated)
+    last_updated_raw = max(synced_timestamps) if synced_timestamps else None
+
+    last_updated_display = None
+    minutes_until_next = None
+    if last_updated_raw:
+        last_updated_utc = _parse_utc(last_updated_raw)
+        last_updated_display = last_updated_utc.astimezone(SAST).strftime("%d %b %Y, %H:%M SAST")
+
+        next_update_utc = last_updated_utc + timedelta(minutes=current_app.config["REFRESH_INTERVAL_MINUTES"])
+        remaining_minutes = (next_update_utc - datetime.now(timezone.utc)).total_seconds() / 60
+        minutes_until_next = max(0, round(remaining_minutes))
+
+    return render_template(
+        "index.html",
+        athletes=athletes,
+        last_updated_display=last_updated_display,
+        minutes_until_next=minutes_until_next,
+    )
 
 
 @bp.route("/auth/strava")
